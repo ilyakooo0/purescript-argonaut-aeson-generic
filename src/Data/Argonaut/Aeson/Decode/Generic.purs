@@ -6,23 +6,24 @@ module Data.Argonaut.Aeson.Decode.Generic
   , genericDecodeAeson
   ) where
 
-import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, ($), (/=), (<$>), (<<<), (<>), (==), (>=>))
+import Partial.Unsafe
 
 import Control.Alt ((<|>))
 import Data.Argonaut.Aeson.Helpers (class AreAllConstructorsNullary, class IsSingleConstructor, Mode(..), areAllConstructorsNullary, isSingleConstructor)
 import Data.Argonaut.Aeson.Options (Options(Options), SumEncoding(..))
 import Data.Argonaut.Core (Json, caseJson, caseJsonArray, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull, toObject, toString)
+import Data.Argonaut.Decode.Error (JsonDecodeError(Named, MissingValue, TypeMismatch))
 import Data.Argonaut.Decode.Generic (class DecodeRepArgs, decodeRepArgs)
 import Data.Array (singleton)
 import Data.Bifunctor (lmap)
-import Data.Argonaut.Decode.Error (JsonDecodeError(Named, MissingValue, TypeMismatch))
 import Data.Either (Either(..), note)
+import Data.Generic.Rep (NoArguments(..))
 import Data.Generic.Rep as Rep
 import Data.Maybe (Maybe(..))
-import Foreign.Object as Foreign
 import Data.Symbol (class IsSymbol, reflectSymbol)
+import Foreign.Object as Foreign
+import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, ($), (/=), (<$>), (<<<), (<>), (==), (>=>))
 import Type.Proxy (Proxy(..))
-import Partial.Unsafe
 
 class DecodeAeson r where
   decodeAeson :: Options -> Json -> Either JsonDecodeError r
@@ -115,7 +116,10 @@ instance decodeAesonConstructorNoArguments' :: IsSymbol name => DecodeAeson' (Re
             then Right (Rep.Constructor Rep.NoArguments)
             else Left $ TypeMismatch "Mismatched constructor tag!"
 
-        _ -> decodeGeneralCase mode options json
+        {options: Options {sumEncoding: TaggedObject taggedObject}} -> do
+          objectJson <- (note (TypeMismatch "expected an object") <<< toObject) json
+          checkTag taggedObject.tagFieldName name objectJson
+          pure (Rep.Constructor NoArguments)
 
 instance decodeAesonConstructorProduct' :: (IsSymbol name, DecodeRepArgs a, DecodeRepArgs b) => DecodeAeson' (Rep.Constructor name (Rep.Product a b)) where
   decodeAeson' mode options json =
