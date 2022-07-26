@@ -127,7 +127,7 @@ instance encodeAesonConstructor' :: (IsSymbol name, EncodeRepArgs a) => EncodeAe
               Rec o' -> o `FO.union` o'
               Arg js
                 | length js == 0
-                -> o
+                -> FO.insert taggedObject.contentsFieldName (fromArray []) o
                 | length js == 1
                 -> FO.insert taggedObject.contentsFieldName (unsafePartial fromJust $ head js) o
                 | otherwise
